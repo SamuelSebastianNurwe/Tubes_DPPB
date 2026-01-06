@@ -1,13 +1,133 @@
 import 'package:flutter/material.dart';
-
 import 'package:intl/intl.dart';
 import '../core/data.dart';
 import '../core/theme.dart';
+import '../models/architect.dart';
+import '../models/order.dart';
+import '../services/auth_service.dart';
+import '../services/order_service.dart';
 
-class DetailArsitekPage extends StatelessWidget {
+class DetailArsitekPage extends StatefulWidget {
   final Architect architect;
 
   const DetailArsitekPage({super.key, required this.architect});
+
+  @override
+  State<DetailArsitekPage> createState() => _DetailArsitekPageState();
+}
+
+class _DetailArsitekPageState extends State<DetailArsitekPage> {
+  final AuthService _authService = AuthService();
+  final OrderService _orderService = OrderService();
+
+  Future<void> _handleOrder() async {
+    final isLoggedIn = await _authService.isLoggedIn();
+
+    if (!mounted) return;
+
+    if (isLoggedIn) {
+      _showOrderForm();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Silakan login untuk memesan')),
+      );
+      Navigator.pushNamed(context, '/login');
+    }
+  }
+
+  void _showOrderForm() {
+    final noteController = TextEditingController();
+    final currencyFormatter = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Form Pemesanan'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Arsitek: ${widget.architect.name}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Harga: ${currencyFormatter.format(widget.architect.startingPrice)}',
+                style: TextStyle(color: AppTheme.primaryColor),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: noteController,
+                decoration: const InputDecoration(
+                  labelText: 'Catatan / Deskripsi Proyek',
+                  border: OutlineInputBorder(),
+                  hintText: 'Contoh: Saya ingin renovasi dapur...',
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              // Create Order
+              final newOrder = Order(
+                id: DateTime.now().toString(),
+                architectName: widget.architect.name,
+                serviceType: 'Jasa Desain Arsitektur',
+                status: 'Menunggu Konfirmasi',
+                orderDate: DateTime.now(),
+                price: widget.architect.startingPrice.toDouble(),
+                note: noteController.text,
+              );
+
+              await _orderService.addOrder(newOrder);
+
+              if (!mounted) return;
+              Navigator.pop(context); // Close Form
+              _showSuccessPopup();
+            },
+            child: const Text('Kirim Pesanan'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessPopup() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Pesanan Berhasil!'),
+        content: const Text(
+          'Pesanan Anda telah dikirim dan menunggu konfirmasi arsitek.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Close Popup
+              Navigator.pop(
+                context,
+              ); // Close Detail Page to return to Dashboard
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +144,7 @@ class DetailArsitekPage extends StatelessWidget {
         elevation: 0,
         leading: Container(
           margin: const EdgeInsets.only(left: 16, top: 8),
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: Colors.white70,
             shape: BoxShape.circle,
           ),
@@ -42,7 +162,7 @@ class DetailArsitekPage extends StatelessWidget {
               height: 300,
               decoration: BoxDecoration(
                 image: DecorationImage(
-                  image: NetworkImage(architect.portfolioImages.first),
+                  image: NetworkImage(widget.architect.portfolioImages.first),
                   fit: BoxFit.cover,
                 ),
               ),
@@ -62,7 +182,9 @@ class DetailArsitekPage extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 30,
-                        backgroundImage: NetworkImage(architect.imageUrl),
+                        backgroundImage: NetworkImage(
+                          widget.architect.imageUrl,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -70,15 +192,15 @@ class DetailArsitekPage extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              architect.name,
-                              style: TextStyle(
+                              widget.architect.name,
+                              style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             Text(
-                              architect.expertise,
-                              style: TextStyle(color: Colors.grey),
+                              widget.architect.expertise,
+                              style: const TextStyle(color: Colors.grey),
                             ),
                           ],
                         ),
@@ -90,8 +212,8 @@ class DetailArsitekPage extends StatelessWidget {
                             color: AppTheme.secondaryColor,
                           ),
                           Text(
-                            architect.rating.toString(),
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                            widget.architect.rating.toString(),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -100,13 +222,13 @@ class DetailArsitekPage extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // Description
-                  Text(
+                  const Text(
                     'Tentang',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    architect.description,
+                    widget.architect.description,
                     style: TextStyle(color: Colors.grey[700], height: 1.5),
                   ),
                   const SizedBox(height: 24),
@@ -126,8 +248,10 @@ class DetailArsitekPage extends StatelessWidget {
                           style: TextStyle(color: Colors.grey[600]),
                         ),
                         Text(
-                          currencyFormatter.format(architect.startingPrice),
-                          style: TextStyle(
+                          currencyFormatter.format(
+                            widget.architect.startingPrice,
+                          ),
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.primaryColor,
@@ -139,7 +263,7 @@ class DetailArsitekPage extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // Portfolio Grid
-                  Text(
+                  const Text(
                     'Portofolio Karya',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                   ),
@@ -155,12 +279,12 @@ class DetailArsitekPage extends StatelessWidget {
                           mainAxisSpacing: 12,
                           childAspectRatio: 1,
                         ),
-                    itemCount: architect.portfolioImages.length,
+                    itemCount: widget.architect.portfolioImages.length,
                     itemBuilder: (context, index) {
                       return ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: Image.network(
-                          architect.portfolioImages[index],
+                          widget.architect.portfolioImages[index],
                           fit: BoxFit.cover,
                         ),
                       );
@@ -175,28 +299,22 @@ class DetailArsitekPage extends StatelessWidget {
       ),
       bottomSheet: Container(
         padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: const Color(0x0D000000),
+              color: Color(0x0D000000),
               blurRadius: 10,
-              offset: const Offset(0, -5),
+              offset: Offset(0, -5),
             ),
           ],
         ),
         child: ElevatedButton(
-          onPressed: () {
-            // Protect feature: Redirect to Login
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Silakan login untuk konsultasi')),
-            );
-            Navigator.pushNamed(context, '/login');
-          },
+          onPressed: _handleOrder,
           style: ElevatedButton.styleFrom(
             minimumSize: const Size(double.infinity, 50),
           ),
-          child: const Text('Konsultasi Sekarang'),
+          child: const Text('Pesan Sekarang'),
         ),
       ),
     );
